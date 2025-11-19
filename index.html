@@ -1,0 +1,481 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Водяной Знак</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0"
+      }
+    }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: white; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f9fafb; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        .check-bg {
+            background-image: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), 
+                              linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #f3f4f6 75%), 
+                              linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel" data-type="module">
+      import React, { useState, useRef, useEffect } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Upload, Type, Image as ImageIcon, Download, LayoutGrid, Maximize, Trash2, Move, Grip, Sliders, Plus, X, Layers } from 'lucide-react';
+
+      // Types as Constants
+      const WatermarkType = { TEXT: 'text', IMAGE: 'image' };
+      const PatternType = { SINGLE: 'single', TILED: 'tiled' };
+
+      // Helper: Hex to RGBA
+      const hexToRgba = (hex, alpha) => {
+          let r = 0, g = 0, b = 0;
+          if (hex.length === 4) {
+              r = parseInt(hex[1] + hex[1], 16);
+              g = parseInt(hex[2] + hex[2], 16);
+              b = parseInt(hex[3] + hex[3], 16);
+          } else if (hex.length === 7) {
+              r = parseInt(hex.slice(1, 3), 16);
+              g = parseInt(hex.slice(3, 5), 16);
+              b = parseInt(hex.slice(5, 7), 16);
+          }
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      };
+
+      // Button Component
+      const Button = ({ children, variant = 'primary', fullWidth = false, className = '', ...props }) => {
+          const baseStyle = "inline-flex items-center justify-center px-4 py-2 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+          const variants = {
+              primary: "border-transparent text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500",
+              secondary: "border-transparent text-blue-700 bg-blue-100 hover:bg-blue-200 focus:ring-blue-500",
+              outline: "border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-blue-500"
+          };
+          return (
+              <button className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...props}>
+                  {children}
+              </button>
+          );
+      };
+
+      const App = () => {
+          // State to hold multiple images
+          const [images, setImages] = useState([]); // Array of { id, src, width, height, name }
+          const [activeImageId, setActiveImageId] = useState(null);
+
+          const [settings, setSettings] = useState({
+              type: WatermarkType.TEXT,
+              text: 'ВОДЯНОЙ ЗНАК',
+              textColor: '#ffffff',
+              textSize: 50,
+              opacity: 0.5,
+              pattern: PatternType.TILED,
+              rotation: -30,
+              imageSrc: null,
+              imageScale: 0.2,
+              spacing: 200, 
+          });
+
+          const canvasRef = useRef(null);
+          const fileInputRef = useRef(null);
+          const addFileInputRef = useRef(null);
+          const logoInputRef = useRef(null);
+
+          // Derived state for the currently selected image
+          const activeImage = images.find(img => img.id === activeImageId);
+
+          // Set first image active if none selected and images exist
+          useEffect(() => {
+              if (!activeImageId && images.length > 0) {
+                  setActiveImageId(images[0].id);
+              }
+          }, [images, activeImageId]);
+
+          const loadImage = (src) => {
+              return new Promise((resolve, reject) => {
+                  const img = new Image();
+                  img.crossOrigin = "anonymous";
+                  img.onload = () => resolve(img);
+                  img.onerror = reject;
+                  img.src = src;
+              });
+          };
+
+          const processFiles = (files) => {
+              const remainingSlots = 5 - images.length;
+              if (remainingSlots <= 0) {
+                  alert("Максимум 5 изображений.");
+                  return;
+              }
+              
+              const filesToProcess = Array.from(files).slice(0, remainingSlots);
+              if (files.length > remainingSlots) {
+                  alert(`Загружено только ${remainingSlots} фото (лимит 5).`);
+              }
+
+              filesToProcess.forEach(file => {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                      if (event.target?.result) {
+                          const img = new Image();
+                          img.onload = () => {
+                              setImages(prev => [
+                                  ...prev, 
+                                  {
+                                      id: Math.random().toString(36).substr(2, 9),
+                                      src: event.target.result,
+                                      width: img.width,
+                                      height: img.height,
+                                      name: file.name
+                                  }
+                              ]);
+                          };
+                          img.src = event.target.result;
+                      }
+                  };
+                  reader.readAsDataURL(file);
+              });
+          };
+
+          const handleImageUpload = (e) => {
+              if (e.target.files) {
+                  processFiles(e.target.files);
+                  e.target.value = ''; // Reset
+              }
+          };
+
+          const handleLogoUpload = (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                      if (event.target?.result) {
+                          setSettings((prev) => ({ ...prev, imageSrc: event.target.result, type: WatermarkType.IMAGE }));
+                      }
+                  };
+                  reader.readAsDataURL(file);
+              }
+          };
+
+          const drawWatermark = async (canvas, imageObj) => {
+              if (!canvas || !imageObj) return;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return;
+
+              canvas.width = imageObj.width;
+              canvas.height = imageObj.height;
+
+              // Draw Base Image
+              try {
+                  const bgImg = await loadImage(imageObj.src);
+                  ctx.drawImage(bgImg, 0, 0);
+              } catch (err) {
+                  console.error("Error loading base image", err);
+                  return;
+              }
+
+              let logoImg = null;
+              if (settings.type === WatermarkType.IMAGE && settings.imageSrc) {
+                  try { logoImg = await loadImage(settings.imageSrc); } catch (err) {}
+              }
+
+              const drawItem = (x, y) => {
+                  ctx.save();
+                  ctx.translate(x, y);
+                  ctx.rotate((settings.rotation * Math.PI) / 180);
+                  
+                  if (settings.type === WatermarkType.TEXT) {
+                      // Fix for transparency: Apply RGBA directly instead of globalAlpha
+                      // This ensures the color itself is transparent, avoiding "muddy" shadows interaction
+                      ctx.fillStyle = hexToRgba(settings.textColor, settings.opacity);
+                      
+                      // Shadow logic: lighter shadow that fades with opacity
+                      // If opacity is low, shadow should be very subtle or gone
+                      if (settings.opacity > 0.1) {
+                          ctx.shadowColor = `rgba(0,0,0,${settings.opacity * 0.3})`;
+                          ctx.shadowBlur = 4;
+                          ctx.shadowOffsetX = 1;
+                          ctx.shadowOffsetY = 1;
+                      } else {
+                          ctx.shadowColor = 'transparent';
+                      }
+
+                      ctx.font = `bold ${settings.textSize}px sans-serif`;
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillText(settings.text, 0, 0);
+                  } else if (settings.type === WatermarkType.IMAGE && logoImg) {
+                      // For images, use globalAlpha
+                      ctx.globalAlpha = settings.opacity;
+                      
+                      // Add slight shadow to logo if needed, or keep clean
+                      ctx.shadowColor = `rgba(0,0,0,${settings.opacity * 0.3})`;
+                      ctx.shadowBlur = 4;
+                      
+                      const baseSize = Math.min(canvas.width, canvas.height);
+                      const targetWidth = baseSize * settings.imageScale;
+                      const aspectRatio = logoImg.width / logoImg.height;
+                      const targetHeight = targetWidth / aspectRatio;
+                      ctx.drawImage(logoImg, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
+                  }
+                  ctx.restore();
+              };
+
+              if (settings.pattern === PatternType.SINGLE) {
+                  drawItem(canvas.width / 2, canvas.height / 2);
+              } else {
+                  let itemW = 0, itemH = 0;
+                  if (settings.type === WatermarkType.TEXT) {
+                      ctx.font = `bold ${settings.textSize}px sans-serif`;
+                      const metrics = ctx.measureText(settings.text);
+                      itemW = metrics.width;
+                      itemH = settings.textSize; 
+                  } else if (logoImg) {
+                      const baseSize = Math.min(canvas.width, canvas.height);
+                      const targetWidth = baseSize * settings.imageScale;
+                      const aspectRatio = logoImg.width / logoImg.height;
+                      itemW = targetWidth;
+                      itemH = targetWidth / aspectRatio;
+                  }
+
+                  const rad = (settings.rotation * Math.PI) / 180;
+                  const absCos = Math.abs(Math.cos(rad));
+                  const absSin = Math.abs(Math.sin(rad));
+                  const boundW = itemW * absCos + itemH * absSin;
+                  const boundH = itemW * absSin + itemH * absCos;
+
+                  const gapX = boundW + settings.spacing; 
+                  const gapY = boundH + settings.spacing;
+                  
+                  const diag = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
+                  
+                  // Optimize loop bounds
+                  for (let y = -diag; y < diag * 2; y += gapY) {
+                      const rowOffset = (Math.floor(y / gapY) % 2) * (gapX / 2);
+                      for (let x = -diag; x < diag * 2; x += gapX) {
+                          const drawX = x + rowOffset;
+                          if (drawX > -gapX && drawX < canvas.width + gapX && y > -gapY && y < canvas.height + gapY) {
+                              drawItem(drawX, y);
+                          }
+                      }
+                  }
+              }
+          };
+
+          // Effect to draw to the visible canvas
+          useEffect(() => {
+              const render = async () => {
+                  if (activeImage && canvasRef.current) {
+                      await drawWatermark(canvasRef.current, activeImage);
+                  }
+              };
+              render();
+          }, [activeImage, settings]);
+
+          const downloadCurrent = () => {
+              const canvas = canvasRef.current;
+              if (!canvas || !activeImage) return;
+              const link = document.createElement('a');
+              // Preserve original extension or default to png
+              const ext = activeImage.name.split('.').pop();
+              const name = activeImage.name.replace(`.${ext}`, `_wm.png`);
+              link.download = name;
+              link.href = canvas.toDataURL('image/png');
+              link.click();
+          };
+
+          const downloadAll = async () => {
+              // Sequential download to avoid browser blocking
+              for (const img of images) {
+                  const tempCanvas = document.createElement('canvas');
+                  await drawWatermark(tempCanvas, img);
+                  const link = document.createElement('a');
+                  const ext = img.name.split('.').pop();
+                  const name = img.name.replace(`.${ext}`, `_wm.png`);
+                  link.download = name;
+                  link.href = tempCanvas.toDataURL('image/png');
+                  link.click();
+                  // Small delay
+                  await new Promise(r => setTimeout(r, 300));
+              }
+          };
+
+          const removeImage = (id, e) => {
+              e.stopPropagation();
+              const newImages = images.filter(i => i.id !== id);
+              setImages(newImages);
+              if (activeImageId === id) {
+                  setActiveImageId(newImages.length > 0 ? newImages[0].id : null);
+              }
+          };
+
+          if (images.length === 0) {
+              return (
+                  <div className="flex items-center justify-center h-screen bg-gray-50 p-4">
+                      <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full border border-gray-100">
+                          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                              <Upload className="w-10 h-10 text-blue-500" />
+                          </div>
+                          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Загрузить фото</h2>
+                          <p className="text-gray-500 mb-8">Добавьте до 5 изображений (PNG, JPG)</p>
+                          <div className="relative">
+                              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                              <Button fullWidth>Выбрать изображения</Button>
+                          </div>
+                      </div>
+                  </div>
+              );
+          }
+
+          return (
+              <div className="flex flex-col lg:flex-row h-screen bg-white overflow-hidden">
+                  {/* Main Content Area */}
+                  <div className="flex-1 bg-gray-50 flex flex-col relative overflow-hidden">
+                      
+                      {/* Canvas Container */}
+                      <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
+                          <div className="relative shadow-xl border border-gray-200 bg-white check-bg max-w-full max-h-full flex items-center justify-center rounded-sm">
+                             {/* We use a key to force re-render canvas if needed, but ref handling is better */}
+                              <canvas ref={canvasRef} className="max-w-full max-h-[75vh] object-contain block" />
+                          </div>
+                      </div>
+
+                      {/* Image Strip / Switcher */}
+                      <div className="h-24 bg-white border-t border-gray-200 flex items-center px-4 space-x-3 overflow-x-auto custom-scrollbar shrink-0">
+                          {images.map((img) => (
+                              <div 
+                                  key={img.id} 
+                                  onClick={() => setActiveImageId(img.id)}
+                                  className={`relative group flex-shrink-0 w-16 h-16 rounded-md border-2 overflow-hidden cursor-pointer transition-all ${activeImageId === img.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                  <img src={img.src} alt="thumb" className="w-full h-full object-cover" />
+                                  <button onClick={(e) => removeImage(img.id, e)} className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <X size={10} />
+                                  </button>
+                              </div>
+                          ))}
+                          
+                          {images.length < 5 && (
+                              <div className="relative flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors">
+                                  <input 
+                                      ref={addFileInputRef}
+                                      type="file" 
+                                      accept="image/*" 
+                                      multiple 
+                                      onChange={handleImageUpload} 
+                                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                                  />
+                                  <Plus className="text-gray-400 w-6 h-6" />
+                              </div>
+                          )}
+                      </div>
+                  </div>
+
+                  {/* Sidebar */}
+                  <div className="w-full lg:w-80 bg-white border-l border-gray-100 flex flex-col h-[40vh] lg:h-full z-10 shadow-lg lg:shadow-none">
+                      <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                          <span className="font-semibold text-gray-800 flex items-center"><Sliders className="w-4 h-4 mr-2"/> Настройки</span>
+                          <div className="flex space-x-1">
+                             <Button variant="outline" onClick={downloadCurrent} className="text-xs px-2 py-1" title="Скачать текущее">
+                                  <Download className="w-4 h-4" />
+                              </Button>
+                             {images.length > 1 && (
+                                  <Button variant="primary" onClick={downloadAll} className="text-xs px-2 py-1" title="Скачать все">
+                                      <Layers className="w-4 h-4 mr-1" /> Все
+                                  </Button>
+                             )}
+                          </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+                          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+                              <button onClick={() => setSettings({ ...settings, type: WatermarkType.TEXT })} className={`flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all ${settings.type === WatermarkType.TEXT ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                  <Type className="w-4 h-4 mr-2" /> Текст
+                              </button>
+                              <button onClick={() => logoInputRef.current?.click()} className={`flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all ${settings.type === WatermarkType.IMAGE ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                  <ImageIcon className="w-4 h-4 mr-2" /> Лого
+                              </button>
+                              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                          </div>
+
+                          {settings.type === WatermarkType.TEXT && (
+                              <div className="space-y-4">
+                                  <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">Текст</label>
+                                      <input type="text" value={settings.text} onChange={(e) => setSettings({ ...settings, text: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                                  </div>
+                                  <div>
+                                      <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500">Размер</label><span className="text-xs text-gray-400">{settings.textSize}px</span></div>
+                                      <input type="range" min="10" max="400" value={settings.textSize} onChange={(e) => setSettings({ ...settings, textSize: Number(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">Цвет</label>
+                                      <div className="flex items-center border border-gray-200 rounded-md px-2 py-1">
+                                          <input type="color" value={settings.textColor} onChange={(e) => setSettings({ ...settings, textColor: e.target.value })} className="w-8 h-8 border-none bg-transparent cursor-pointer rounded-sm" />
+                                          <span className="ml-2 text-xs text-gray-600 font-mono uppercase">{settings.textColor}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {settings.type === WatermarkType.IMAGE && (
+                              <div>
+                                  <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500">Размер лого</label><span className="text-xs text-gray-400">{Math.round(settings.imageScale * 100)}%</span></div>
+                                  <input type="range" min="0.05" max="1" step="0.01" value={settings.imageScale} onChange={(e) => setSettings({ ...settings, imageScale: parseFloat(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                              </div>
+                          )}
+
+                          <div className="space-y-6 pt-4 border-t border-gray-100">
+                              <div>
+                                  <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500">Прозрачность</label><span className="text-xs text-gray-400">{Math.round(settings.opacity * 100)}%</span></div>
+                                  <input type="range" min="0.05" max="1" step="0.01" value={settings.opacity} onChange={(e) => setSettings({ ...settings, opacity: parseFloat(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                              </div>
+                              <div>
+                                  <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500">Поворот</label><span className="text-xs text-gray-400">{settings.rotation}°</span></div>
+                                  <input type="range" min="-180" max="180" step="5" value={settings.rotation} onChange={(e) => setSettings({ ...settings, rotation: parseInt(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-medium text-gray-500 mb-2">Расположение</label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.SINGLE })} className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${settings.pattern === PatternType.SINGLE ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                                          <Maximize className="w-5 h-5 mb-1" /><span className="text-xs">По центру</span>
+                                      </button>
+                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.TILED })} className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${settings.pattern === PatternType.TILED ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                                          <LayoutGrid className="w-5 h-5 mb-1" /><span className="text-xs">Замостить</span>
+                                      </button>
+                                  </div>
+                              </div>
+                              {settings.pattern === PatternType.TILED && (
+                                  <div>
+                                      <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500 flex items-center"><Move className="w-3 h-3 mr-1" /> Интервал</label><span className="text-xs text-gray-400">{settings.spacing}px</span></div>
+                                      <input type="range" min="0" max="800" step="10" value={settings.spacing} onChange={(e) => setSettings({ ...settings, spacing: parseInt(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          );
+      };
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+</body>
+</html>
