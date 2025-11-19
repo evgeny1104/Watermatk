@@ -18,7 +18,7 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: white; }
+        body { font-family: 'Inter', sans-serif; background-color: white; margin: 0; padding: 0; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f9fafb; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
@@ -201,12 +201,8 @@
                   ctx.rotate((settings.rotation * Math.PI) / 180);
                   
                   if (settings.type === WatermarkType.TEXT) {
-                      // Fix for transparency: Apply RGBA directly instead of globalAlpha
-                      // This ensures the color itself is transparent, avoiding "muddy" shadows interaction
                       ctx.fillStyle = hexToRgba(settings.textColor, settings.opacity);
                       
-                      // Shadow logic: lighter shadow that fades with opacity
-                      // If opacity is low, shadow should be very subtle or gone
                       if (settings.opacity > 0.1) {
                           ctx.shadowColor = `rgba(0,0,0,${settings.opacity * 0.3})`;
                           ctx.shadowBlur = 4;
@@ -221,10 +217,7 @@
                       ctx.textBaseline = 'middle';
                       ctx.fillText(settings.text, 0, 0);
                   } else if (settings.type === WatermarkType.IMAGE && logoImg) {
-                      // For images, use globalAlpha
                       ctx.globalAlpha = settings.opacity;
-                      
-                      // Add slight shadow to logo if needed, or keep clean
                       ctx.shadowColor = `rgba(0,0,0,${settings.opacity * 0.3})`;
                       ctx.shadowBlur = 4;
                       
@@ -265,7 +258,6 @@
                   
                   const diag = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
                   
-                  // Optimize loop bounds
                   for (let y = -diag; y < diag * 2; y += gapY) {
                       const rowOffset = (Math.floor(y / gapY) % 2) * (gapX / 2);
                       for (let x = -diag; x < diag * 2; x += gapX) {
@@ -278,7 +270,6 @@
               }
           };
 
-          // Effect to draw to the visible canvas
           useEffect(() => {
               const render = async () => {
                   if (activeImage && canvasRef.current) {
@@ -292,7 +283,6 @@
               const canvas = canvasRef.current;
               if (!canvas || !activeImage) return;
               const link = document.createElement('a');
-              // Preserve original extension or default to png
               const ext = activeImage.name.split('.').pop();
               const name = activeImage.name.replace(`.${ext}`, `_wm.png`);
               link.download = name;
@@ -301,7 +291,6 @@
           };
 
           const downloadAll = async () => {
-              // Sequential download to avoid browser blocking
               for (const img of images) {
                   const tempCanvas = document.createElement('canvas');
                   await drawWatermark(tempCanvas, img);
@@ -311,7 +300,6 @@
                   link.download = name;
                   link.href = tempCanvas.toDataURL('image/png');
                   link.click();
-                  // Small delay
                   await new Promise(r => setTimeout(r, 300));
               }
           };
@@ -327,16 +315,16 @@
 
           if (images.length === 0) {
               return (
-                  <div className="flex items-center justify-center h-screen bg-gray-50 p-4">
-                      <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full border border-gray-100">
-                          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                              <Upload className="w-10 h-10 text-blue-500" />
+                  <div className="w-full max-w-md mx-auto p-2">
+                      <div className="bg-white p-4 rounded-xl shadow-sm text-center border border-gray-200">
+                          <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <Upload className="w-6 h-6 text-blue-500" />
                           </div>
-                          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Загрузить фото</h2>
-                          <p className="text-gray-500 mb-8">Добавьте до 5 изображений (PNG, JPG)</p>
+                          <h3 className="text-base font-semibold text-gray-800 mb-1">Наложить водяной знак</h3>
+                          <p className="text-xs text-gray-500 mb-4">Загрузите фото (до 5 шт)</p>
                           <div className="relative">
                               <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                              <Button fullWidth>Выбрать изображения</Button>
+                              <Button fullWidth className="text-sm py-2">Загрузить изображения</Button>
                           </div>
                       </div>
                   </div>
@@ -344,25 +332,24 @@
           }
 
           return (
-              <div className="flex flex-col lg:flex-row h-screen bg-white overflow-hidden">
+              <div className="flex flex-col lg:flex-row h-[600px] w-full bg-white overflow-hidden border border-gray-200 rounded-xl shadow-sm">
                   {/* Main Content Area */}
                   <div className="flex-1 bg-gray-50 flex flex-col relative overflow-hidden">
                       
                       {/* Canvas Container */}
                       <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
                           <div className="relative shadow-xl border border-gray-200 bg-white check-bg max-w-full max-h-full flex items-center justify-center rounded-sm">
-                             {/* We use a key to force re-render canvas if needed, but ref handling is better */}
-                              <canvas ref={canvasRef} className="max-w-full max-h-[75vh] object-contain block" />
+                              <canvas ref={canvasRef} className="max-w-full max-h-[500px] object-contain block" />
                           </div>
                       </div>
 
                       {/* Image Strip / Switcher */}
-                      <div className="h-24 bg-white border-t border-gray-200 flex items-center px-4 space-x-3 overflow-x-auto custom-scrollbar shrink-0">
+                      <div className="h-20 bg-white border-t border-gray-200 flex items-center px-4 space-x-3 overflow-x-auto custom-scrollbar shrink-0">
                           {images.map((img) => (
                               <div 
                                   key={img.id} 
                                   onClick={() => setActiveImageId(img.id)}
-                                  className={`relative group flex-shrink-0 w-16 h-16 rounded-md border-2 overflow-hidden cursor-pointer transition-all ${activeImageId === img.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'}`}
+                                  className={`relative group flex-shrink-0 w-14 h-14 rounded-md border-2 overflow-hidden cursor-pointer transition-all ${activeImageId === img.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'}`}
                               >
                                   <img src={img.src} alt="thumb" className="w-full h-full object-cover" />
                                   <button onClick={(e) => removeImage(img.id, e)} className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -372,7 +359,7 @@
                           ))}
                           
                           {images.length < 5 && (
-                              <div className="relative flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors">
+                              <div className="relative flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors">
                                   <input 
                                       ref={addFileInputRef}
                                       type="file" 
@@ -381,7 +368,7 @@
                                       onChange={handleImageUpload} 
                                       className="absolute inset-0 opacity-0 cursor-pointer" 
                                   />
-                                  <Plus className="text-gray-400 w-6 h-6" />
+                                  <Plus className="text-gray-400 w-5 h-5" />
                               </div>
                           )}
                       </div>
@@ -389,33 +376,33 @@
 
                   {/* Sidebar */}
                   <div className="w-full lg:w-80 bg-white border-l border-gray-100 flex flex-col h-[40vh] lg:h-full z-10 shadow-lg lg:shadow-none">
-                      <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
-                          <span className="font-semibold text-gray-800 flex items-center"><Sliders className="w-4 h-4 mr-2"/> Настройки</span>
+                      <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                          <span className="font-semibold text-sm text-gray-800 flex items-center"><Sliders className="w-4 h-4 mr-2"/> Настройки</span>
                           <div className="flex space-x-1">
-                             <Button variant="outline" onClick={downloadCurrent} className="text-xs px-2 py-1" title="Скачать текущее">
+                             <Button variant="outline" onClick={downloadCurrent} className="text-xs px-2 py-1 h-8" title="Скачать текущее">
                                   <Download className="w-4 h-4" />
                               </Button>
                              {images.length > 1 && (
-                                  <Button variant="primary" onClick={downloadAll} className="text-xs px-2 py-1" title="Скачать все">
+                                  <Button variant="primary" onClick={downloadAll} className="text-xs px-2 py-1 h-8" title="Скачать все">
                                       <Layers className="w-4 h-4 mr-1" /> Все
                                   </Button>
                              )}
                           </div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+                      <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
                           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
-                              <button onClick={() => setSettings({ ...settings, type: WatermarkType.TEXT })} className={`flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all ${settings.type === WatermarkType.TEXT ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                  <Type className="w-4 h-4 mr-2" /> Текст
+                              <button onClick={() => setSettings({ ...settings, type: WatermarkType.TEXT })} className={`flex items-center justify-center py-1.5 rounded-md text-xs font-medium transition-all ${settings.type === WatermarkType.TEXT ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                  <Type className="w-3 h-3 mr-2" /> Текст
                               </button>
-                              <button onClick={() => logoInputRef.current?.click()} className={`flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all ${settings.type === WatermarkType.IMAGE ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                  <ImageIcon className="w-4 h-4 mr-2" /> Лого
+                              <button onClick={() => logoInputRef.current?.click()} className={`flex items-center justify-center py-1.5 rounded-md text-xs font-medium transition-all ${settings.type === WatermarkType.IMAGE ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                  <ImageIcon className="w-3 h-3 mr-2" /> Лого
                               </button>
                               <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                           </div>
 
                           {settings.type === WatermarkType.TEXT && (
-                              <div className="space-y-4">
+                              <div className="space-y-3">
                                   <div>
                                       <label className="block text-xs font-medium text-gray-500 mb-1">Текст</label>
                                       <input type="text" value={settings.text} onChange={(e) => setSettings({ ...settings, text: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
@@ -427,7 +414,7 @@
                                   <div>
                                       <label className="block text-xs font-medium text-gray-500 mb-1">Цвет</label>
                                       <div className="flex items-center border border-gray-200 rounded-md px-2 py-1">
-                                          <input type="color" value={settings.textColor} onChange={(e) => setSettings({ ...settings, textColor: e.target.value })} className="w-8 h-8 border-none bg-transparent cursor-pointer rounded-sm" />
+                                          <input type="color" value={settings.textColor} onChange={(e) => setSettings({ ...settings, textColor: e.target.value })} className="w-8 h-6 border-none bg-transparent cursor-pointer rounded-sm" />
                                           <span className="ml-2 text-xs text-gray-600 font-mono uppercase">{settings.textColor}</span>
                                       </div>
                                   </div>
@@ -441,7 +428,7 @@
                               </div>
                           )}
 
-                          <div className="space-y-6 pt-4 border-t border-gray-100">
+                          <div className="space-y-4 pt-3 border-t border-gray-100">
                               <div>
                                   <div className="flex justify-between mb-1"><label className="text-xs font-medium text-gray-500">Прозрачность</label><span className="text-xs text-gray-400">{Math.round(settings.opacity * 100)}%</span></div>
                                   <input type="range" min="0.05" max="1" step="0.01" value={settings.opacity} onChange={(e) => setSettings({ ...settings, opacity: parseFloat(e.target.value) })} className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
@@ -453,11 +440,11 @@
                               <div>
                                   <label className="block text-xs font-medium text-gray-500 mb-2">Расположение</label>
                                   <div className="grid grid-cols-2 gap-2">
-                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.SINGLE })} className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${settings.pattern === PatternType.SINGLE ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-                                          <Maximize className="w-5 h-5 mb-1" /><span className="text-xs">По центру</span>
+                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.SINGLE })} className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${settings.pattern === PatternType.SINGLE ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                                          <Maximize className="w-4 h-4 mb-1" /><span className="text-xs">По центру</span>
                                       </button>
-                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.TILED })} className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${settings.pattern === PatternType.TILED ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-                                          <LayoutGrid className="w-5 h-5 mb-1" /><span className="text-xs">Замостить</span>
+                                      <button onClick={() => setSettings({ ...settings, pattern: PatternType.TILED })} className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${settings.pattern === PatternType.TILED ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                                          <LayoutGrid className="w-4 h-4 mb-1" /><span className="text-xs">Замостить</span>
                                       </button>
                                   </div>
                               </div>
